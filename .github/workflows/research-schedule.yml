@@ -1,0 +1,116 @@
+name: Research Agents - Scheduled Execution
+
+on:
+  # Ejecutar cada domingo a las 22:00 UTC
+  # Ejecutar cada miércoles a las 22:00 UTC
+  schedule:
+    - cron: '0 22 * * 0'  # Sunday 22:00 UTC
+    - cron: '0 22 * * 3'  # Wednesday 22:00 UTC
+  
+  # Permitir ejecución manual desde GitHub Actions UI
+  workflow_dispatch:
+
+jobs:
+  run-agents:
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout del código
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      # Instalar dependencias
+      - name: Install dependencies
+        run: npm install
+
+      # Crear directorio para reportes locales (backup)
+      - name: Create reports directory
+        run: mkdir -p reports
+
+      # Ejecutar Agent 1
+      - name: Run Agent 1 - Open Source Programs
+        env:
+          GOOGLE_GEMINI_API_KEY: ${{ secrets.GOOGLE_GEMINI_API_KEY }}
+          GOOGLE_GEMINI_API_KEY_2: ${{ secrets.GOOGLE_GEMINI_API_KEY_2 }}
+          GOOGLE_GEMINI_API_KEY_3: ${{ secrets.GOOGLE_GEMINI_API_KEY_3 }}
+          GOOGLE_GEMINI_API_KEY_4: ${{ secrets.GOOGLE_GEMINI_API_KEY_4 }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node agents/agent1-opensource.js
+        continue-on-error: true
+
+      # Pequeña pausa entre agentes
+      - name: Wait 30 seconds
+        run: sleep 30
+
+      # Ejecutar Agent 2
+      - name: Run Agent 2 - AI Open Source
+        env:
+          GOOGLE_GEMINI_API_KEY: ${{ secrets.GOOGLE_GEMINI_API_KEY }}
+          GOOGLE_GEMINI_API_KEY_2: ${{ secrets.GOOGLE_GEMINI_API_KEY_2 }}
+          GOOGLE_GEMINI_API_KEY_3: ${{ secrets.GOOGLE_GEMINI_API_KEY_3 }}
+          GOOGLE_GEMINI_API_KEY_4: ${{ secrets.GOOGLE_GEMINI_API_KEY_4 }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node agents/agent2-ai-opensource.js
+        continue-on-error: true
+
+      # Pequeña pausa entre agentes
+      - name: Wait 30 seconds
+        run: sleep 30
+
+      # Ejecutar Agent 3
+      - name: Run Agent 3 - Chinese Alternatives
+        env:
+          GOOGLE_GEMINI_API_KEY: ${{ secrets.GOOGLE_GEMINI_API_KEY }}
+          GOOGLE_GEMINI_API_KEY_2: ${{ secrets.GOOGLE_GEMINI_API_KEY_2 }}
+          GOOGLE_GEMINI_API_KEY_3: ${{ secrets.GOOGLE_GEMINI_API_KEY_3 }}
+          GOOGLE_GEMINI_API_KEY_4: ${{ secrets.GOOGLE_GEMINI_API_KEY_4 }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node agents/agent3-chinese-alternatives.js
+        continue-on-error: true
+
+      # Pequeña pausa entre agentes
+      - name: Wait 30 seconds
+        run: sleep 30
+
+      # Ejecutar Agent 4
+      - name: Run Agent 4 - Updates & Changes
+        env:
+          GOOGLE_GEMINI_API_KEY: ${{ secrets.GOOGLE_GEMINI_API_KEY }}
+          GOOGLE_GEMINI_API_KEY_2: ${{ secrets.GOOGLE_GEMINI_API_KEY_2 }}
+          GOOGLE_GEMINI_API_KEY_3: ${{ secrets.GOOGLE_GEMINI_API_KEY_3 }}
+          GOOGLE_GEMINI_API_KEY_4: ${{ secrets.GOOGLE_GEMINI_API_KEY_4 }}
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.GOOGLE_DRIVE_FOLDER_ID }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node agents/agent4-updates-changes.js
+        continue-on-error: true
+
+      # Commit y push de cambios locales (si los hay)
+      - name: Commit and push results
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "Research Agents Bot"
+          git add . || true
+          git commit -m "🤖 Research agents execution: $(date '+%Y-%m-%d %H:%M:%S')" || true
+          git push || true
+
+      # Notificación en caso de error (opcional)
+      - name: Log execution completion
+        if: always()
+        run: echo "✅ Research agents execution completed at $(date)"

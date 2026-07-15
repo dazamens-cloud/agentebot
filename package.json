@@ -1,0 +1,37 @@
+{
+  "name": "research-agent-opensource",
+  "version": "1.0.0",
+  "description": "4 agentes de research automático para monitorear open-source tools, IAs, alternativas chinas y updates",
+  "main": "index.js",
+  "scripts": {
+    "start": "node run-agents.js",
+    "run": "node run-agents.js",
+    "agent1": "node agents/agent1-opensource.js",
+    "agent2": "node agents/agent2-ai-opensource.js",
+    "agent3": "node agents/agent3-chinese-alternatives.js",
+    "agent4": "node agents/agent4-updates-changes.js",
+    "all": "node run-agents.js",
+    "demo": "node agents/DEMO-all-agents.js"
+  },
+  "keywords": [
+    "research",
+    "open-source",
+    "automation",
+    "github-actions"
+  ],
+  "author": "dazamens",
+  "license": "MIT",
+  "dependencies": {
+    "@google/generative-ai": "^0.12.0",
+    "googleapis": "^118.0.0",
+    "google-auth-library": "^9.0.0",
+    "dotenv": "^16.0.0",
+    "node-fetch": "^2.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
