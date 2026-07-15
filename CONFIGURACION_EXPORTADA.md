@@ -31,10 +31,12 @@ Backup en: C:\Users\andre\OneDrive\Desktop\research-agent-opensource
 ### Archivo .env Configurado
 **Credenciales activas:**
 - ✅ GOOGLE_GEMINI_API_KEY (4 keys configuradas)
-- ✅ TELEGRAM_BOT_TOKEN: 8762612121:AAG_Bo4dqBBJuvfrsfZ0r8tiJwVIA8jGmf0
-- ✅ TELEGRAM_CHAT_ID: 791595479
-- ✅ GOOGLE_DRIVE_FOLDER_ID: 10HBJ5UwBJ9yxaF3wMxKcIU7AHNFpZd7p
+- ✅ TELEGRAM_BOT_TOKEN: [CONFIGURADO - ver .env local]
+- ✅ TELEGRAM_CHAT_ID: [CONFIGURADO - ver .env local]
+- ✅ GOOGLE_DRIVE_FOLDER_ID: [CONFIGURADO - ver .env local]
 - ✅ GOOGLE_SERVICE_ACCOUNT_KEY: Configurada
+
+⚠️ **IMPORTANTE:** Las credenciales reales se encuentran en el archivo `.env` local (nunca versionado en Git)
 
 **Ubicación del .env:**
 ```
@@ -195,9 +197,11 @@ node-fetch
 ## 📞 CONTACTO / REFERENCIAS
 
 - **Email:** dazamens@gmail.com
-- **Telegram Chat ID:** 791595479
+- **Telegram Chat ID:** [PRIVADO - configurado en .env]
 - **Google Cloud Project:** research-agents-bot
-- **Drive Folder:** 10HBJ5UwBJ9yxaF3wMxKcIU7AHNFpZd7p
+- **Drive Folder:** [PRIVADO - configurado en .env]
+
+⚠️ **NOTA:** No compartas credenciales en archivos versionados en Git
 
 ---
 

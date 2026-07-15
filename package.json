@@ -11,7 +11,8 @@
     "agent3": "node agents/agent3-chinese-alternatives.js",
     "agent4": "node agents/agent4-updates-changes.js",
     "all": "node run-agents.js",
-    "demo": "node agents/DEMO-all-agents.js"
+    "demo": "node agents/DEMO-all-agents.js",
+    "test:telegram": "node test-telegram.js"
   },
   "keywords": [
     "research",
