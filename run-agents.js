@@ -1,113 +1,121 @@
 #!/usr/bin/env node
 
 /**
- * RESEARCH AGENTS RUNNER - Google Gemini Version
+ * RESEARCH AGENTS RUNNER v2 - Google Gemini Edition
  * Ejecuta los 4 agentes de research con Google Gemini API (GRATIS)
- * 
+ *
+ * Cambios en v2:
+ * - Ejecución en paralelo (3-4 min en lugar de 15-20)
+ * - Mejor validación de configuración
+ * - Logging mejorado
+ * - Uso de AgentFactory para eliminar duplicación
+ *
  * Uso:
- *   node run-agents.js              # Ejecuta todos los agentes
+ *   node run-agents.js              # Ejecuta todos los agentes (en paralelo)
  *   node run-agents.js agent1       # Ejecuta solo Agent 1
- *   node run-agents.js --help       # Muestra ayuda
+ *   node run-agents.js --parallel   # Fuerza ejecución paralela (default)
+ *   node run-agents.js --sequential # Ejecución secuencial (más lenta)
  */
 
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
+const { config, validateConfig } = require('./lib/config');
+const logger = require('./lib/logger');
+const { createAgent } = require('./lib/agentFactory');
 
-// Importar los agentes
-const { runAgent1 } = require('./agents/agent1-opensource');
-const { runAgent2 } = require('./agents/agent2-ai-opensource');
-const { runAgent3 } = require('./agents/agent3-chinese-alternatives');
-const { runAgent4 } = require('./agents/agent4-updates-changes');
-
-const agents = {
-  agent1: { name: 'Agent 1: Open-Source Programs', fn: runAgent1 },
-  agent2: { name: 'Agent 2: AI Open-Source', fn: runAgent2 },
-  agent3: { name: 'Agent 3: Chinese Alternatives', fn: runAgent3 },
-  agent4: { name: 'Agent 4: Software Updates & Changes', fn: runAgent4 },
-};
+// Crear agentes dinámicamente desde config
+const agents = {};
+config.agents.forEach((agentConfig) => {
+  agents[agentConfig.id] = {
+    name: agentConfig.name,
+    config: agentConfig,
+    fn: createAgent(agentConfig),
+  };
+});
 
 async function validateSetup() {
-  console.log('\n🔍 Validando setup...\n');
+  logger.info('Validando configuración...');
 
-  // Verificar API key
-  if (!process.env.GOOGLE_GEMINI_API_KEY) {
-    console.error('❌ Error: GOOGLE_GEMINI_API_KEY no configurada');
-    console.error('   Solución: Edita .env y agrega tu Google Gemini API key');
-    console.error('   Obtenerla de: https://aistudio.google.com/app/apikeys\n');
+  // Validar API keys
+  const validation = validateConfig();
+  if (!validation.valid) {
+    validation.errors.forEach((error) => logger.error(error));
     process.exit(1);
   }
 
-  console.log('✓ Google Gemini API Key detectada');
+  logger.success('Configuración validada');
 
-  // Verificar estructura de carpetas
-  const requiredDirs = ['./agents', './utils', './reports'];
+  // Crear directorios necesarios
+  const requiredDirs = [
+    config.paths.reports,
+    config.paths.agents,
+    config.paths.utils,
+    './lib',
+  ];
+
   for (const dir of requiredDirs) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
-      console.log(`✓ Carpeta ${dir} creada`);
+      logger.debug(`Carpeta creada: ${dir}`);
     }
   }
 
-  console.log('✓ Estructura de carpetas validada\n');
+  logger.success('Estructura de carpetas validada');
 }
 
-async function runSelectedAgents(selectedAgents) {
-  console.log('\n' + '█'.repeat(70));
-  console.log('🚀 RESEARCH AGENTS - Google Gemini Edition');
-  console.log('█'.repeat(70) + '\n');
+async function runAgentsParallel(selectedAgents) {
+  logger.info('Ejecutando agentes en PARALELO');
 
-  const startTime = Date.now();
-  let completed = 0;
-  let failed = 0;
+  const promises = selectedAgents.map((agentKey) => agents[agentKey].fn());
 
-  for (const [key, agent] of Object.entries(agents)) {
-    if (!selectedAgents.includes(key)) continue;
+  try {
+    const results = await Promise.all(promises);
+    return results;
+  } catch (error) {
+    logger.error(`Error en ejecución paralela: ${error.message}`);
+    throw error;
+  }
+}
 
+async function runAgentsSequential(selectedAgents) {
+  logger.info('Ejecutando agentes de forma SECUENCIAL');
+
+  const results = [];
+
+  for (const agentKey of selectedAgents) {
     try {
-      console.log(`\n${'='.repeat(70)}`);
-      console.log(`⚙️  ${agent.name}`);
-      console.log(`${'='.repeat(70)}\n`);
+      const result = await agents[agentKey].fn();
+      results.push(result);
 
-      await agent.fn();
-      completed++;
+      // Pausa entre agentes secuenciales
+      if (selectedAgents.indexOf(agentKey) < selectedAgents.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
     } catch (error) {
-      console.error(`\n❌ Error en ${agent.name}:`, error.message);
-      failed++;
-    }
-
-    // Pequeña pausa entre agentes
-    if (selectedAgents.indexOf(key) < selectedAgents.length - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      logger.error(`Error en ${agents[agentKey].name}: ${error.message}`);
+      results.push({ success: false, agent: agentKey, error: error.message });
     }
   }
 
-  // Resumen final
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-
-  console.log('\n\n' + '█'.repeat(70));
-  console.log('✅ EJECUCIÓN COMPLETADA');
-  console.log('█'.repeat(70));
-  console.log(`\n📊 Resultados:`);
-  console.log(`   Agentes exitosos: ${completed}`);
-  console.log(`   Agentes fallidos: ${failed}`);
-  console.log(`   Tiempo total: ${elapsed}s`);
-  console.log(`\n📂 Reportes guardados en: ./reports/\n`);
+  return results;
 }
 
 async function main() {
   const args = process.argv.slice(2);
+  let mode = 'parallel'; // default
 
-  // Help
+  // Parse arguments
   if (args.includes('--help') || args.includes('-h')) {
     console.log(`
-🤖 Research Agents Runner - Google Gemini Edition
+🤖 Research Agents Runner v2 - Google Gemini Edition
 
 USO:
-  node run-agents.js                 Ejecutar todos los agentes
-  node run-agents.js agent1          Ejecutar solo Agent 1
-  node run-agents.js agent1 agent3   Ejecutar Agents 1 y 3
-  node run-agents.js --help          Mostrar esta ayuda
+  node run-agents.js                    Ejecutar todos (paralelo)
+  node run-agents.js agent1             Ejecutar solo Agent 1
+  node run-agents.js agent1 agent3      Ejecutar Agents 1 y 3
+  node run-agents.js --sequential       Ejecutar todos (secuencial, más lento)
+  node run-agents.js --help             Mostrar esta ayuda
 
 AGENTES DISPONIBLES:
   • agent1    Agent 1: Open-Source Programs
@@ -116,14 +124,15 @@ AGENTES DISPONIBLES:
   • agent4    Agent 4: Software Updates & Changes
 
 EJEMPLOS:
-  node run-agents.js                 # Todos los agentes
-  node run-agents.js agent4          # Solo el que detecta crises
-  node run-agents.js agent1 agent2   # Primeros dos agentes
+  node run-agents.js                    # Todos en paralelo (~3-4 min)
+  node run-agents.js agent4             # Solo Agent 4
+  node run-agents.js agent1 agent2      # Agents 1 y 2 en paralelo
+  node run-agents.js --sequential       # Todos secuencial (~15-20 min)
 
 REQUIREMENTS:
-  • Google Gemini API Key en .env (gratuita)
+  • Google Gemini API Keys en .env (gratuita)
   • Node.js 18+
-  • npm install (dependencias)
+  • npm install
 
 DOCUMENTACIÓN:
   • QUICK-START.md   - Setup de 5 minutos
@@ -133,11 +142,15 @@ DOCUMENTACIÓN:
     return;
   }
 
+  if (args.includes('--sequential')) {
+    mode = 'sequential';
+    args.splice(args.indexOf('--sequential'), 1);
+  }
+
   // Validar setup
   try {
     await validateSetup();
   } catch (error) {
-    console.error('❌ Error de validación:', error.message);
     process.exit(1);
   }
 
@@ -146,21 +159,54 @@ DOCUMENTACIÓN:
 
   if (args.length > 0) {
     selectedAgents = args.filter((arg) => agents[arg]);
-    
+
     if (selectedAgents.length === 0) {
-      console.error('❌ Error: No se reconocieron los agentes especificados');
-      console.error('   Agentes válidos: agent1, agent2, agent3, agent4\n');
+      logger.error('No se reconocieron los agentes especificados');
+      logger.error('Agentes válidos: agent1, agent2, agent3, agent4');
       process.exit(1);
     }
   }
 
   // Ejecutar
   try {
-    await runSelectedAgents(selectedAgents);
+    logger.info('█'.repeat(70));
+    logger.info('🚀 RESEARCH AGENTS - Google Gemini v2');
+    logger.info('█'.repeat(70));
+
+    const startTime = Date.now();
+
+    let results;
+    if (mode === 'parallel') {
+      results = await runAgentsParallel(selectedAgents);
+    } else {
+      results = await runAgentsSequential(selectedAgents);
+    }
+
+    // Resumen
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    const successful = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    logger.info('█'.repeat(70));
+    logger.success('EJECUCIÓN COMPLETADA');
+    logger.info('█'.repeat(70));
+
+    logger.info(`Agentes ejecutados: ${selectedAgents.length}`);
+    logger.success(`  ✅ Exitosos: ${successful}`);
+    if (failed > 0) {
+      logger.error(`  ❌ Fallidos: ${failed}`);
+    }
+    logger.info(`  ⏱️  Tiempo total: ${elapsed}s`);
+    logger.info(`  📂 Reportes en: ${config.paths.reports}/`);
+
+    process.exit(failed > 0 ? 1 : 0);
   } catch (error) {
-    console.error('❌ Error durante ejecución:', error);
+    logger.error(`Error fatal: ${error.message}`);
     process.exit(1);
   }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  logger.error(`Error no manejado: ${error.message}`);
+  process.exit(1);
+});

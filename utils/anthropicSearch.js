@@ -1,39 +1,30 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { config } = require('../lib/config');
+const logger = require('../lib/logger');
 
 /**
- * Obtener API key según el número del agente
- * Agent 1 → KEY_1, Agent 2 → KEY_2, Agent 3 → KEY_3, Agent 4 → KEY_4
- */
-function getGoogleAPIKey(agentNumber) {
-  const keys = [
-    process.env.GOOGLE_GEMINI_API_KEY,      // Agent 1
-    process.env.GOOGLE_GEMINI_API_KEY_2,    // Agent 2
-    process.env.GOOGLE_GEMINI_API_KEY_3,    // Agent 3
-    process.env.GOOGLE_GEMINI_API_KEY_4,    // Agent 4
-  ];
-  
-  const keyIndex = (agentNumber - 1) % 4;
-  const key = keys[keyIndex];
-  
-  if (!key) {
-    throw new Error(`API Key ${agentNumber} not found in environment variables`);
-  }
-  
-  return key;
-}
-
-/**
- * Realizar búsqueda web y análisis con Google Gemini
+ * Realizar búsqueda con retry logic
  */
 async function searchAndAnalyze(query, analysisPrompt, agentNumber = 1) {
-  try {
-    console.log(`🔍 Buscando: ${query}`);
+  const maxAttempts = config.retry.maxAttempts;
+  let lastError = null;
+  let delay = config.retry.initialDelay;
 
-    const apiKey = getGoogleAPIKey(agentNumber);
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      logger.debug(`Buscando: "${query}" (intento ${attempt}/${maxAttempts})`);
 
-    const prompt = `
+      const apiKey = config.api.google.getKey(agentNumber);
+
+      if (!apiKey || apiKey === 'demo-mode-will-skip-api-calls') {
+        logger.warn(`API Key no configurada para Agent ${agentNumber}`);
+        return [];
+      }
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: config.api.google.model });
+
+      const prompt = `
 Realiza una búsqueda exhaustiva sobre: "${query}"
 
 ${analysisPrompt}
@@ -52,28 +43,40 @@ Formato de respuesta: JSON array con objetos que tengan:
 }
 
 Solo retorna el JSON, sin explicaciones adicionales.
-    `;
+      `;
 
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text();
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
 
-    try {
-      // Limpiar posibles backticks markdown
-      const cleanedText = responseText
-        .replace(/```json\n?/g, '')
-        .replace(/```\n?/g, '')
-        .trim();
-      
-      const parsed = JSON.parse(cleanedText);
-      return Array.isArray(parsed) ? parsed : [parsed];
-    } catch (parseError) {
-      console.log('No se pudo parsear JSON, retornando texto raw');
-      return [{ resultado: responseText }];
+      try {
+        const cleanedText = responseText
+          .replace(/```json\n?/g, '')
+          .replace(/```\n?/g, '')
+          .trim();
+
+        const parsed = JSON.parse(cleanedText);
+        const data = Array.isArray(parsed) ? parsed : [parsed];
+
+        logger.success(`Búsqueda exitosa: "${query}" (${data.length} resultados)`);
+        return data;
+      } catch (parseError) {
+        logger.warn(`No se pudo parsear JSON en búsqueda "${query}"`);
+        return [];
+      }
+    } catch (error) {
+      lastError = error;
+      logger.warn(`Error en intento ${attempt}: ${error.message}`);
+
+      if (attempt < maxAttempts) {
+        logger.debug(`Esperando ${delay}ms antes de reintentar...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay = Math.min(delay * config.retry.backoffMultiplier, config.retry.maxDelay);
+      }
     }
-  } catch (error) {
-    console.error(`Error en búsqueda "${query}":`, error.message);
-    return [];
   }
+
+  logger.error(`Búsqueda fallida después de ${maxAttempts} intentos: "${query}"`, lastError);
+  return [];
 }
 
 /**
