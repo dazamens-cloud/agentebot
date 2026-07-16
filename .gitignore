@@ -33,3 +33,4 @@ service-account-key.json
 # Testing
 .nyc_output/
 coverage/
+.env
